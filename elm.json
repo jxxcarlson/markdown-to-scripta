@@ -3,7 +3,7 @@
     "name": "jxxcarlson/markdown-to-scripta",
     "summary": "Convert Markdown to Scripta markup language",
     "license": "MIT",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "exposed-modules": [
         "MarkdownToScripta"
     ],
