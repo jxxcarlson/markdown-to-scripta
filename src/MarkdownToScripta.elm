@@ -1,5 +1,12 @@
 module MarkdownToScripta exposing (convert)
 
+{-| Convert Markdown to Scripta markup language.
+
+# Conversion
+@docs convert
+
+-}
+
 import Markdown.AST exposing (Document)
 import Markdown.Parser as Parser
 import Markdown.Renderer as Renderer
