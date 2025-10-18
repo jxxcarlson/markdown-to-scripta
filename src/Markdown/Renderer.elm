@@ -53,7 +53,21 @@ renderBlock block =
             "| quotation\n" ++ (blocks |> List.map renderBlock |> String.join "\n")
 
         Table rows ->
-            "| table\n" ++ (rows |> List.map renderTableRow |> String.join "\n")
+            let
+              nColumns =
+                case (rows |> List.head) of
+                    Just firstRow ->
+                        List.length firstRow
+
+                    Nothing ->
+                        0
+
+              format = String.repeat nColumns "l"
+
+                --headerSeparator =
+                --    List.repeat nColumns "---" |> String.join " & " ++ " \\\\"
+             in
+            "| table " ++ format++ "\n" ++ (rows |> List.map renderTableRow |> String.join "\n")
 
         HorizontalRule ->
             "[hrule]"
