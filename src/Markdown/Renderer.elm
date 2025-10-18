@@ -52,22 +52,23 @@ renderBlock block =
         Blockquote blocks ->
             "| quotation\n" ++ (blocks |> List.map renderBlock |> String.join "\n")
 
+
         Table rows ->
-            let
-              nColumns =
-                case (rows |> List.head) of
-                    Just firstRow ->
-                        List.length firstRow
+                    let
+                      nColumns =
+                        case (rows |> List.head) of
+                            Just firstRow ->
+                                List.length firstRow
 
-                    Nothing ->
-                        0
+                            Nothing ->
+                                0
 
-              format = String.repeat nColumns "l"
+                      format = String.repeat nColumns "l"
 
-                --headerSeparator =
-                --    List.repeat nColumns "---" |> String.join " & " ++ " \\\\"
-             in
-            "| table " ++ format++ "\n" ++ (rows |> List.map renderTableRow |> String.join "\n")
+                        --headerSeparator =
+                        --    List.repeat nColumns "---" |> String.join " & " ++ " \\\\"
+                     in
+                    "| csvtable " ++ format++ "\n" ++ (rows |> List.map renderCSVTableRow |> String.join "\n")
 
         HorizontalRule ->
             "[hrule]"
@@ -81,6 +82,10 @@ renderBlock block =
 renderTableRow : List String -> String
 renderTableRow cells =
     String.join " & " cells ++ " \\\\"
+
+renderCSVTableRow : List String -> String
+renderCSVTableRow cells =
+    String.join ", " cells
 
 
 {-| Render list items

@@ -45,19 +45,40 @@ the table below is not rendered properly.
 
 | Markdown | Scripta | Example |
 |----------|---------|---------|
-| Headings | Same | `# Heading` → `# Heading` |
-| Bold | `[b ...]` | `**bold**` → `[b bold]` |
-| Italic | `[i ...]` | `*italic*` → `[i italic]` |
-| Inline code | Same | `` `code` `` → `` `code` `` |
-| Code blocks | `\| code` | ` ```python ` → `\| code python` |
-| Links | `[link ...]` | `[text](url)` → `[link text url]` |
-| Images | `[link ...]` | `![alt](url)` → `[link alt url]` |
-| Blockquotes | `\| quotation` | `> quote` → `\| quotation` |
-| Tables | `\| table` | Pipe tables → `\| table` format |
-| Horizontal rule | `[hrule]` | `---` → `[hrule]` |
-| Lists | Same | `- item` → `- item` |
-| Inline math | Same | `$x^2$` → `$x^2$` |
-| Display math | `\| equation` | `$$E=mc^2$$` → `\| equation` |
+| Headings | Same | # Heading → # Heading |
+| Bold | [b ...] | **bold** → [b bold] |
+| Italic | [i ...] | *italic* → [i italic] |
+| Inline code | Same |  code  →  code  |
+| Code blocks |(1) | ```THE CODE``` → (1)
+| Links | [link ...] | [text](url) → [link text url] |
+| Images | [link ...] | ![alt](url) → [link alt url] |
+| Blockquotes | (2) | > THE QUOTATION  → (2)
+| Tables | (3) | Pipe table → (3)
+| Horizontal rule | [hrule] | --- → [hrule] |
+| Lists | Same | - item → - item |
+| Numbered List | . item | 2. item → . item
+| Inline math | Same | $x^2$ → $x^2$ |
+| Display math | (4) | $$THE EQUATION$$ → (4)
+
+
+```
+  Scripta Examples
+  
+  (1)
+  | code
+  THE CODE
+  
+  (2)
+  | quotation
+  THE QUOTATION
+  
+  (3)
+  | csvtable
+  COMMA SEPARATED DATA
+  
+  | equation
+  THE EQUATION
+```
 
 ## Math Support
 
