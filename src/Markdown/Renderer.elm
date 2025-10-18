@@ -34,7 +34,14 @@ renderBlock block =
             renderInlines inlines
 
         CodeBlock maybeLang code ->
-            "| code" ++ (maybeLang |> Maybe.map (\lang -> " " ++ lang) |> Maybe.withDefault "") ++ "\n" ++ code
+            let
+                indentedCode =
+                    code
+                        |> String.lines
+                        |> List.map (\line -> "  " ++ line)
+                        |> String.join "\n"
+            in
+            "| code" ++ (maybeLang |> Maybe.map (\lang -> " " ++ lang) |> Maybe.withDefault "") ++ "\n" ++ indentedCode
 
         MathBlock math ->
             "| equation\n" ++ math

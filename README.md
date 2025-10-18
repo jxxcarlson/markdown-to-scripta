@@ -2,6 +2,9 @@
 
 Convert Markdown syntax to [Scripta](https://scripta.io) markup language.
 
+There is only one exported function: `convert : String -> String`
+in the module `MarkdownToScripta`.
+
 ## Installation
 
 ```bash
@@ -21,10 +24,10 @@ This is **bold** and this is *italic*.
 
 - Item 1
 - Item 2
-"""
 
 scripta : String
 scripta = MarkdownToScripta.convert markdown
+
 -- Result:
 -- # Hello World
 --
@@ -35,6 +38,10 @@ scripta = MarkdownToScripta.convert markdown
 ```
 
 ## Supported Markdown Features
+
+See [the repo](https://github.com/jxxcarlson/markdown-to-scripta) if
+the table below is not rendered properly.
+
 
 | Markdown | Scripta | Example |
 |----------|---------|---------|
@@ -83,21 +90,11 @@ A live demo application is included in the `demo/` directory:
 
 ```bash
 cd demo/
-elm-watch hot
+sh make.sh
 ```
 
 Then open `build/index.html` in your browser.
 
-## Development
-
-```bash
-# Build the package
-elm make src/MarkdownToScripta.elm
-
-# Build the demo app
-cd demo/
-sh make.sh
-```
 
 ## License
 

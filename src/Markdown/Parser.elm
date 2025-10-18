@@ -290,15 +290,35 @@ paragraphParser : Parser Block
 paragraphParser =
     getChompedString (chompUntilEndOr "\n")
         |> andThen
-            (\str ->
-                if String.isEmpty str then
+            (\firstLine ->
+                if String.isEmpty firstLine then
                     problem "Empty paragraph"
-
                 else
-                    parseInlines str
-                        |> map Paragraph
+                    succeed firstLine
+                        |. oneOf [ symbol "\n", end ]
+                        |> andThen (\first ->
+                            loop [ first ] paragraphHelper
+                                |> andThen (\lines ->
+                                    parseInlines (String.join " " lines)
+                                        |> map Paragraph
+                                )
+                        )
             )
-        |> andThen (\p -> succeed p |. oneOf [ symbol "\n", end ])
+
+
+paragraphHelper : List String -> Parser (Step (List String) (List String))
+paragraphHelper lines =
+    oneOf
+        [ getChompedString (chompUntilEndOr "\n")
+            |> andThen (\line ->
+                if String.isEmpty line then
+                    succeed (Done (List.reverse lines))
+                else
+                    succeed (Loop (line :: lines))
+                        |. oneOf [ symbol "\n", end ]
+            )
+        , succeed (Done (List.reverse lines))
+        ]
 
 
 {-| Parse blank lines
