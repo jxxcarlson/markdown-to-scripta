@@ -100,7 +100,7 @@ renderBlock block =
                         _ ->
                             envName
             in
-            "| " ++ blockName ++ propsStr ++ "\n" ++ (blocks |> List.map renderBlock |> String.join "\n")
+            "| " ++ blockName ++ propsStr ++ "\n" ++ (blocks |> List.map renderBlock |> String.join "\n\n")
 
         BlankLine ->
             ""

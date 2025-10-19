@@ -107,6 +107,10 @@ tests =
       , latex = "\\begin{align}\n\\int_{0}^{1} x^n \\, dx &= \\frac{1}{n+1}, \\qquad n>-1,\\\\\n\\sum_{k=1}^{\\infty} \\frac{1}{k^2} &= \\frac{\\pi^2}{6}.\n\\end{align}"
       , expected = "| aligned\n  \\int_{0}^{1} x^n \\, dx &= \\frac{1}{n+1}, \\qquad n>-1,\\\\\n  \\sum_{k=1}^{\\infty} \\frac{1}{k^2} &= \\frac{\\pi^2}{6}."
       }
+    , { name = "Theorem with nested equation"
+      , latex = "\\begin{theorem}[Cauchy--Schwarz]\nFor all $\\vb x,\\vb y\\in V$,\n\\begin{equation}\n|\\langle \\vb x,\\vb y\\rangle| \\le \\|\\vb x\\|\\;\\|\\vb y\\|.\n\\end{equation}\n\\end{theorem}"
+      , expected = "| theorem Cauchy--Schwarz\nFor all $\\vb x,\\vb y\\in V$,\n\n| equation\n|\\langle \\vb x,\\vb y\\rangle| \\le \\|\\vb x\\|\\;\\|\\vb y\\|."
+      }
     ]
 
 
