@@ -148,6 +148,10 @@ renderInline inline =
                 "code" ->
                     "`" ++ renderInlines args ++ "`"
 
+                "text" ->
+                    -- \text{...} in math mode -> "..."
+                    "\"" ++ renderInlines args ++ "\""
+
                 "href" ->
                     -- \href{url}{text} - but we only have args as combined
                     "[link " ++ renderInlines args ++ "]"
@@ -163,7 +167,8 @@ renderInline inline =
         VFun name content ->
             case name of
                 "math" ->
-                    content
+                    -- Replace \text{...} with "..." in math mode
+                    replaceTextCommands content
 
                 "verb" ->
                     "`" ++ content ++ "`"
@@ -173,3 +178,77 @@ renderInline inline =
 
                 _ ->
                     content
+
+
+{-| Replace \text{...} with "..." in math expressions
+-}
+replaceTextCommands : String -> String
+replaceTextCommands str =
+    case findTextCommand str of
+        Nothing ->
+            str
+
+        Just ( before, textContent, after ) ->
+            before ++ "\"" ++ textContent ++ "\"" ++ replaceTextCommands after
+
+
+{-| Find the first \text{...} command and split the string into before, content, and after
+-}
+findTextCommand : String -> Maybe ( String, String, String )
+findTextCommand str =
+    case String.indexes "\\text{" str of
+        [] ->
+            Nothing
+
+        firstIndex :: _ ->
+            let
+                -- Start after \text{
+                contentStart =
+                    firstIndex + 6
+
+                -- Find the matching closing brace
+                afterText =
+                    String.dropLeft contentStart str
+            in
+            case findClosingBrace afterText 0 of
+                Nothing ->
+                    Nothing
+
+                Just closingPos ->
+                    let
+                        before =
+                            String.left firstIndex str
+
+                        textContent =
+                            String.left closingPos afterText
+
+                        after =
+                            String.dropLeft (closingPos + 1) afterText
+                    in
+                    Just ( before, textContent, after )
+
+
+{-| Find the position of the closing brace, accounting for nesting
+-}
+findClosingBrace : String -> Int -> Maybe Int
+findClosingBrace str pos =
+    case String.uncons (String.dropLeft pos str) of
+        Nothing ->
+            Nothing
+
+        Just ( char, _ ) ->
+            if char == '}' then
+                Just pos
+
+            else if char == '{' then
+                -- Found nested brace, need to find its closing brace first
+                case findClosingBrace str (pos + 1) of
+                    Nothing ->
+                        Nothing
+
+                    Just nestedClose ->
+                        -- Continue after nested closing brace
+                        findClosingBrace str (nestedClose + 1)
+
+            else
+                findClosingBrace str (pos + 1)
