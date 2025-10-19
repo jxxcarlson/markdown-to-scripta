@@ -1,5 +1,6 @@
 module LaTeX.Renderer exposing (render)
 
+import Dict
 import LaTeX.AST exposing (..)
 
 
@@ -45,39 +46,55 @@ renderBlock block =
         Paragraph inlines ->
             renderInlines inlines
 
-        List listType items ->
-            renderListItems listType items
+        List listType props items ->
+            renderListItems listType props items
 
-        VerbatimBlock envName content ->
-            case envName of
-                "verbatim" ->
-                    "| code\n" ++ indentLines content
+        VerbatimBlock envName props content ->
+            let
+                propsStr =
+                    renderProperties props
 
-                "code" ->
-                    "| code\n" ++ indentLines content
+                blockName =
+                    case envName of
+                        "verbatim" ->
+                            "code"
 
-                "equation" ->
-                    "| equation\n" ++ content
+                        "code" ->
+                            "code"
 
-                _ ->
-                    "| " ++ envName ++ "\n" ++ content
+                        "equation" ->
+                            "equation"
 
-        OrdinaryBlock envName blocks ->
-            case envName of
-                "theorem" ->
-                    "| theorem\n" ++ (blocks |> List.map renderBlock |> String.join "\n")
+                        _ ->
+                            envName
 
-                "lemma" ->
-                    "| lemma\n" ++ (blocks |> List.map renderBlock |> String.join "\n")
+                contentStr =
+                    case envName of
+                        "verbatim" ->
+                            indentLines content
 
-                "proof" ->
-                    "| proof\n" ++ (blocks |> List.map renderBlock |> String.join "\n")
+                        "code" ->
+                            indentLines content
 
-                "quote" ->
-                    "| quotation\n" ++ (blocks |> List.map renderBlock |> String.join "\n")
+                        _ ->
+                            content
+            in
+            "| " ++ blockName ++ propsStr ++ "\n" ++ contentStr
 
-                _ ->
-                    "| " ++ envName ++ "\n" ++ (blocks |> List.map renderBlock |> String.join "\n")
+        OrdinaryBlock envName props blocks ->
+            let
+                propsStr =
+                    renderProperties props
+
+                blockName =
+                    case envName of
+                        "quote" ->
+                            "quotation"
+
+                        _ ->
+                            envName
+            in
+            "| " ++ blockName ++ propsStr ++ "\n" ++ (blocks |> List.map renderBlock |> String.join "\n")
 
         BlankLine ->
             ""
@@ -95,15 +112,26 @@ indentLines str =
 
 {-| Render list items
 -}
-renderListItems : ListType -> List ListItem -> String
-renderListItems listType items =
-    items
-        |> List.indexedMap (renderListItem listType)
-        |> String.join "\n"
+renderListItems : ListType -> Properties -> List ListItem -> String
+renderListItems listType props items =
+    case listType of
+        Description ->
+            -- Description lists need special handling with properties
+            let
+                propsStr =
+                    renderProperties props
+            in
+            "| description" ++ propsStr ++ "\n" ++ (items |> List.map renderDescriptionItem |> String.join "\n")
+
+        _ ->
+            -- Regular lists (itemize, enumerate)
+            items
+                |> List.indexedMap (renderListItem listType)
+                |> String.join "\n"
 
 
 renderListItem : ListType -> Int -> ListItem -> String
-renderListItem listType index inlines =
+renderListItem listType index item =
     let
         marker =
             case listType of
@@ -112,8 +140,24 @@ renderListItem listType index inlines =
 
                 Enumerate ->
                     String.fromInt (index + 1) ++ ". "
+
+                Description ->
+                    -- This shouldn't be called for description lists
+                    "- "
     in
-    marker ++ renderInlines inlines
+    marker ++ renderInlines item.content
+
+
+{-| Render a description list item with its label
+-}
+renderDescriptionItem : ListItem -> String
+renderDescriptionItem item =
+    case item.label of
+        Just label ->
+            "  " ++ renderInlines label ++ " :: " ++ renderInlines item.content
+
+        Nothing ->
+            "  :: " ++ renderInlines item.content
 
 
 {-| Render inline elements
@@ -252,3 +296,32 @@ findClosingBrace str pos =
 
             else
                 findClosingBrace str (pos + 1)
+
+
+{-| Render properties dict to string format: " key:value, key2:value2"
+Returns empty string if no properties
+-}
+renderProperties : Properties -> String
+renderProperties props =
+    if Dict.isEmpty props then
+        ""
+
+    else
+        " "
+            ++ (props
+                    |> Dict.toList
+                    |> List.map renderProperty
+                    |> String.join ", "
+               )
+
+
+{-| Render a single property key-value pair
+-}
+renderProperty : ( String, String ) -> String
+renderProperty ( key, value ) =
+    if value == "?" then
+        -- Standalone property without value
+        key
+
+    else
+        key ++ ":" ++ value

@@ -1,11 +1,17 @@
-module LaTeX.AST exposing (Block(..), Inline(..), Document, ListItem, ListType(..), Name)
+module LaTeX.AST exposing (Block(..), Inline(..), Document, ListItem, ListType(..), Name, Properties)
 
 {-| Abstract Syntax Tree for LaTeX documents
 -}
 
+import Dict exposing (Dict)
+
 
 type alias Name =
     String
+
+
+type alias Properties =
+    Dict String String
 
 
 type alias Document =
@@ -15,19 +21,22 @@ type alias Document =
 type Block
     = Section Int Name (List Block) -- level (1=section, 2=subsection, 3=subsubsection), title, content
     | Paragraph (List Inline)
-    | List ListType (List ListItem)
-    | VerbatimBlock Name String -- environment name, content
-    | OrdinaryBlock Name (List Block) -- environment name, content blocks
+    | List ListType Properties (List ListItem) -- list type, properties, items
+    | VerbatimBlock Name Properties String -- environment name, properties, content
+    | OrdinaryBlock Name Properties (List Block) -- environment name, properties, content blocks
     | BlankLine
 
 
 type ListType
     = Itemize
     | Enumerate
+    | Description
 
 
 type alias ListItem =
-    List Inline
+    { label : Maybe (List Inline) -- optional label for description lists
+    , content : List Inline
+    }
 
 
 type Inline

@@ -91,6 +91,10 @@ tests =
       , latex = "We have \\textbf{bold} and $x^2$ in one line."
       , expected = "We have [b bold] and $x^2$ in one line."
       }
+    , { name = "Environment with properties"
+      , latex = "\\begin{theorem}[leftmargin=2em,label=\\arabic*,blahblah]\nThere are infinitely many primes.\n\\end{theorem}"
+      , expected = "| theorem leftmargin:2em, label:\\arabic*, blahblah\nThere are infinitely many primes."
+      }
     ]
 
 

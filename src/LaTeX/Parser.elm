@@ -1,5 +1,6 @@
 module LaTeX.Parser exposing (parse, deadEndsToString)
 
+import Dict
 import LaTeX.AST exposing (..)
 import Parser.Advanced as Parser exposing ((|.), (|=), Parser)
 
@@ -152,57 +153,108 @@ braceContent =
         |. symbol "}"
 
 
-{-| Parse environments: \\begin{name}...\\end{name}
+{-| Parse environments: \\begin{name}[properties]...\\end{name}
 -}
 environmentParser : LaTeXParser Block
 environmentParser =
-    Parser.succeed identity
+    Parser.succeed Tuple.pair
         |. symbol "\\begin"
         |. spaces
         |. symbol "{"
         |= Parser.getChompedString (Parser.chompUntil (Parser.Token "}" (ExpectingSymbol "}")))
         |. symbol "}"
+        |= optionalPropertiesParser
         |. spaces
         |. Parser.oneOf [ symbol "\n", Parser.succeed () ]
         |> Parser.andThen
-            (\envName ->
+            (\( envName, props ) ->
                 Parser.inContext ("environment: " ++ envName)
                     (case envName of
                         "itemize" ->
-                            listContentParser Itemize envName
+                            listContentParser Itemize envName props
 
                         "enumerate" ->
-                            listContentParser Enumerate envName
+                            listContentParser Enumerate envName props
+
+                        "description" ->
+                            listContentParser Description envName props
 
                         "verbatim" ->
-                            verbatimContentParser envName
+                            verbatimContentParser envName props
 
                         "equation" ->
-                            verbatimContentParser envName
+                            verbatimContentParser envName props
 
                         "code" ->
-                            verbatimContentParser envName
+                            verbatimContentParser envName props
 
                         _ ->
-                            ordinaryBlockParser envName
+                            ordinaryBlockParser envName props
                     )
             )
 
 
+{-| Parse optional properties in square brackets: [key=value, key=value]
+-}
+optionalPropertiesParser : LaTeXParser Properties
+optionalPropertiesParser =
+    Parser.oneOf
+        [ Parser.succeed identity
+            |. symbol "["
+            |= Parser.getChompedString (Parser.chompUntil (Parser.Token "]" (ExpectingSymbol "]")))
+            |. symbol "]"
+            |> Parser.map parseProperties
+        , Parser.succeed Dict.empty
+        ]
+
+
+{-| Parse properties string into a Dict
+Format: "key=value, key2=value2, standalone"
+-}
+parseProperties : String -> Properties
+parseProperties str =
+    str
+        |> String.split ","
+        |> List.map String.trim
+        |> List.filterMap parseProperty
+        |> Dict.fromList
+
+
+{-| Parse a single property: "key=value" or "standalone"
+-}
+parseProperty : String -> Maybe ( String, String )
+parseProperty str =
+    case String.split "=" str of
+        [ key ] ->
+            -- Standalone property like "blahblah"
+            Just ( String.trim key, "?" )
+
+        [ key, value ] ->
+            -- Key-value pair
+            Just ( String.trim key, String.trim value )
+
+        key :: rest ->
+            -- Handle cases like "label=\arabic*" which might have special chars
+            Just ( String.trim key, String.trim (String.join "=" rest) )
+
+        [] ->
+            Nothing
+
+
 {-| Parse list content (items)
 -}
-listContentParser : ListType -> Name -> LaTeXParser Block
-listContentParser listType envName =
-    Parser.loop [] (listItemHelper envName)
-        |> Parser.map (List listType)
+listContentParser : ListType -> Name -> Properties -> LaTeXParser Block
+listContentParser listType envName props =
+    Parser.loop [] (listItemHelper listType envName)
+        |> Parser.map (List listType props)
 
 
-listItemHelper : Name -> List ListItem -> LaTeXParser (Parser.Step (List ListItem) (List ListItem))
-listItemHelper envName items =
+listItemHelper : ListType -> Name -> List ListItem -> LaTeXParser (Parser.Step (List ListItem) (List ListItem))
+listItemHelper listType envName items =
     Parser.oneOf
         [ Parser.succeed (\item -> Parser.Loop (item :: items))
             |. spaces
-            |= itemParser
+            |= itemParser listType
         , Parser.succeed ()
             |. spaces
             |. symbol "\\end"
@@ -215,24 +267,42 @@ listItemHelper envName items =
         ]
 
 
-{-| Parse a single \\item
+{-| Parse a single \\item, with optional [label] for description lists
 -}
-itemParser : LaTeXParser ListItem
-itemParser =
-    Parser.succeed identity
+itemParser : ListType -> LaTeXParser ListItem
+itemParser listType =
+    Parser.succeed Tuple.pair
         |. symbol "\\item"
+        |= (case listType of
+                Description ->
+                    -- Try to parse optional [label]
+                    Parser.oneOf
+                        [ Parser.succeed Just
+                            |. spaces
+                            |. symbol "["
+                            |= (Parser.getChompedString (Parser.chompUntil (Parser.Token "]" (ExpectingSymbol "]")))
+                                    |> Parser.andThen parseInlinesFromString
+                               )
+                            |. symbol "]"
+                        , Parser.succeed Nothing
+                        ]
+
+                _ ->
+                    Parser.succeed Nothing
+           )
         |. spaces
         |= (Parser.getChompedString (Parser.chompUntilEndOr "\n")
                 |> Parser.andThen parseInlinesFromString
            )
         |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
+        |> Parser.map (\( label, content ) -> { label = label, content = content })
 
 
 {-| Parse verbatim content (doesn't parse inner structure)
 -}
-verbatimContentParser : Name -> LaTeXParser Block
-verbatimContentParser envName =
-    Parser.succeed (\content -> VerbatimBlock envName (String.trim content))
+verbatimContentParser : Name -> Properties -> LaTeXParser Block
+verbatimContentParser envName props =
+    Parser.succeed (\content -> VerbatimBlock envName props (String.trim content))
         |= Parser.getChompedString (Parser.chompUntil (Parser.Token ("\\end{" ++ envName ++ "}") (ExpectingEnvironmentEnd envName)))
         |. symbol "\\end"
         |. spaces
@@ -244,10 +314,10 @@ verbatimContentParser envName =
 
 {-| Parse ordinary block content (recursively parse blocks inside)
 -}
-ordinaryBlockParser : Name -> LaTeXParser Block
-ordinaryBlockParser envName =
+ordinaryBlockParser : Name -> Properties -> LaTeXParser Block
+ordinaryBlockParser envName props =
     Parser.loop [] (ordinaryBlockHelper envName)
-        |> Parser.map (OrdinaryBlock envName)
+        |> Parser.map (OrdinaryBlock envName props)
 
 
 ordinaryBlockHelper : Name -> List Block -> LaTeXParser (Parser.Step (List Block) (List Block))
