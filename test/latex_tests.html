@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>LaTeX Tests</title>
+    <script src="latex_tests.js"></script>
+    <style>
+        body { background: white; color: black; padding: 20px; font-family: monospace; }
+        pre { background: #f0f0f0; padding: 10px; margin: 10px 0; white-space: pre-wrap; }
+        h3 { color: #333; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>LaTeX to Scripta Tests</h1>
+    <div id="app"></div>
+    <script>
+        try {
+            var app = Elm.LaTeXTests.init({ node: document.getElementById("app") });
+            console.log("Elm app initialized successfully");
+        } catch (e) {
+            console.error("Error initializing Elm app:", e);
+            document.getElementById("app").innerHTML = "<pre>Error: " + e.message + "</pre>";
+        }
+    </script>
+</body>
+</html>
