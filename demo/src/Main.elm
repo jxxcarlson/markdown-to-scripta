@@ -4,22 +4,30 @@ import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import LaTeXToScripta
 import MarkdownToScripta
 
 
 -- MODEL
 
 
+type InputMode
+    = Markdown
+    | LaTeX
+
+
 type alias Model =
-    { markdown : String
+    { input : String
     , scripta : String
+    , mode : InputMode
     }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { markdown = exampleMarkdown
+    ( { input = exampleMarkdown
       , scripta = ""
+      , mode = Markdown
       }
     , Cmd.none
     )
@@ -69,22 +77,91 @@ Check out [Google](https://google.com)
 That's all folks!"""
 
 
+exampleLaTeX : String
+exampleLaTeX =
+    """\\section{Introduction}
+
+This is a \\textbf{bold} statement and this is \\textit{italic}.
+
+\\subsection{Mathematical Expressions}
+
+The famous equation $E=mc^2$ demonstrates mass-energy equivalence.
+
+\\begin{equation}
+a^2 + b^2 = c^2
+\\end{equation}
+
+\\subsection{Lists}
+
+\\begin{itemize}
+\\item First item
+\\item Second item
+\\item Third item
+\\end{itemize}
+
+\\begin{enumerate}
+\\item First numbered item
+\\item Second numbered item
+\\end{enumerate}
+
+\\subsection{Code}
+
+Here is some \\texttt{inline code} and a block:
+
+\\begin{verbatim}
+def hello():
+    print("Hello, World!")
+\\end{verbatim}
+
+\\subsection{Theorem}
+
+\\begin{theorem}
+There are infinitely many prime numbers.
+\\end{theorem}
+
+That's all folks!"""
+
+
 -- UPDATE
 
 
 type Msg
-    = MarkdownChanged String
+    = InputChanged String
     | Convert
+    | SwitchMode InputMode
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        MarkdownChanged newMarkdown ->
-            ( { model | markdown = newMarkdown }, Cmd.none )
+        InputChanged newInput ->
+            ( { model | input = newInput }, Cmd.none )
 
         Convert ->
-            ( { model | scripta = MarkdownToScripta.convert model.markdown }
+            let
+                converted =
+                    case model.mode of
+                        Markdown ->
+                            MarkdownToScripta.convert model.input
+
+                        LaTeX ->
+                            LaTeXToScripta.convert model.input
+            in
+            ( { model | scripta = converted }
+            , Cmd.none
+            )
+
+        SwitchMode newMode ->
+            let
+                newInput =
+                    case newMode of
+                        Markdown ->
+                            exampleMarkdown
+
+                        LaTeX ->
+                            exampleLaTeX
+            in
+            ( { model | mode = newMode, input = newInput, scripta = "" }
             , Cmd.none
             )
 
@@ -95,14 +172,47 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div [ class "container" ]
-        [ h1 [] [ text "Markdown to Scripta Converter" ]
-        , p [ class "subtitle" ] [ text "Convert Markdown syntax to Scripta markup language" ]
+        [ h1 [] [ text "Markdown/LaTeX to Scripta Converter" ]
+        , p [ class "subtitle" ] [ text "Convert Markdown or LaTeX syntax to Scripta markup language" ]
+        , div [ class "mode-toggle" ]
+            [ button
+                [ onClick (SwitchMode Markdown)
+                , class
+                    (if model.mode == Markdown then
+                        "mode-btn active"
+
+                     else
+                        "mode-btn"
+                    )
+                ]
+                [ text "Markdown" ]
+            , button
+                [ onClick (SwitchMode LaTeX)
+                , class
+                    (if model.mode == LaTeX then
+                        "mode-btn active"
+
+                     else
+                        "mode-btn"
+                    )
+                ]
+                [ text "LaTeX" ]
+            ]
         , div [ class "grid" ]
             [ div [ class "column" ]
-                [ label [] [ text "Markdown Input" ]
+                [ label []
+                    [ text
+                        (case model.mode of
+                            Markdown ->
+                                "Markdown Input"
+
+                            LaTeX ->
+                                "LaTeX Input"
+                        )
+                    ]
                 , textarea
-                    [ value model.markdown
-                    , onInput MarkdownChanged
+                    [ value model.input
+                    , onInput InputChanged
                     , rows 20
                     , class "editor"
                     ]
@@ -120,22 +230,34 @@ view model =
                 ]
             ]
         , button [ onClick Convert, class "convert-btn" ] [ text "Convert to Scripta" ]
-        , viewRules
+        , viewRules model.mode
         ]
 
 
-viewRules : Html Msg
-viewRules =
+viewRules : InputMode -> Html Msg
+viewRules mode =
     div [ class "rules" ]
         [ h2 [] [ text "Conversion Rules" ]
         , div [ class "rules-grid" ]
-            [ ruleItem "Headings" "Same as Markdown (# ## ###)"
-            , ruleItem "Bold/Italic" "**bold** → [b bold], *italic* → [i italic]"
-            , ruleItem "Links" "[text](url) → [link text url]"
-            , ruleItem "Images" "![alt](url) → [link alt url]"
-            , ruleItem "Code Blocks" "``` → | code"
-            , ruleItem "Blockquotes" "> text → | quotation"
-            ]
+            (case mode of
+                Markdown ->
+                    [ ruleItem "Headings" "Same as Markdown (# ## ###)"
+                    , ruleItem "Bold/Italic" "**bold** → [b bold], *italic* → [i italic]"
+                    , ruleItem "Links" "[text](url) → [link text url]"
+                    , ruleItem "Images" "![alt](url) → [link alt url]"
+                    , ruleItem "Code Blocks" "``` → | code"
+                    , ruleItem "Blockquotes" "> text → | quotation"
+                    ]
+
+                LaTeX ->
+                    [ ruleItem "Sections" "\\section{} → #, \\subsection{} → ##"
+                    , ruleItem "Bold/Italic" "\\textbf{} → [b], \\textit{} → [i]"
+                    , ruleItem "Math" "$...$ → $...$, \\begin{equation} → | equation"
+                    , ruleItem "Code" "\\texttt{} → `, \\begin{verbatim} → | code"
+                    , ruleItem "Lists" "\\begin{itemize} → -, \\begin{enumerate} → 1."
+                    , ruleItem "Environments" "\\begin{theorem} → | theorem"
+                    ]
+            )
         ]
 
 
