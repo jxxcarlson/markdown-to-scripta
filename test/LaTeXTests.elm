@@ -57,7 +57,7 @@ tests =
       }
     , { name = "Enumerate list"
       , latex = "\\begin{enumerate}\n\\item First\n\\item Second\n\\item Third\n\\end{enumerate}"
-      , expected = "1. First\n2. Second\n3. Third"
+      , expected = ". First\n. Second\n. Third"
       }
     , { name = "Verbatim block"
       , latex = "\\begin{verbatim}\nfor i in range(5):\n    print(i)\n\\end{verbatim}"
@@ -93,7 +93,15 @@ tests =
       }
     , { name = "Environment with properties"
       , latex = "\\begin{theorem}[leftmargin=2em,label=\\arabic*,blahblah]\nThere are infinitely many primes.\n\\end{theorem}"
-      , expected = "| theorem leftmargin:2em, label:\\arabic*, blahblah\nThere are infinitely many primes."
+      , expected = "| theorem leftmargin:2em label:\\arabic* blahblah\nThere are infinitely many primes."
+      }
+    , { name = "Lists with properties"
+      , latex = "\\begin{itemize}[leftmargin=2em]\n\\item Bullet one.\n\\item Bullet two with inline math $a^2+b^2=c^2$.\n\\end{itemize}\n\\begin{enumerate}[leftmargin=2em,label=\\arabic*)]\n\\item First.\n\\item Second.\n\\item Third.\n\\end{enumerate}"
+      , expected = "| item leftmargin:2em\n- Bullet one.\n- Bullet two with inline math $a^2+b^2=c^2$.\n\n| numbered leftmargin:2em label:\\arabic*)\n. First.\n. Second.\n. Third."
+      }
+    , { name = "Equation with label"
+      , latex = "\\begin{equation}\n\\label{eq:newton}\nm \\ddot{\\vb x}(t) = -\\nabla V\\!\\bigl(\\vb x(t)\\bigr).\n\\end{equation}"
+      , expected = "| equation label:eq:newton\nm \\ddot{\\vb x}(t) = -\\nabla V\\!\\bigl(\\vb x(t)\\bigr)."
       }
     ]
 

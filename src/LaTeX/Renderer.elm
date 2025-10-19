@@ -123,11 +123,37 @@ renderListItems listType props items =
             in
             "| description" ++ propsStr ++ "\n" ++ (items |> List.map renderDescriptionItem |> String.join "\n")
 
-        _ ->
-            -- Regular lists (itemize, enumerate)
-            items
-                |> List.indexedMap (renderListItem listType)
-                |> String.join "\n"
+        Itemize ->
+            -- Itemize lists with properties
+            let
+                propsStr =
+                    renderProperties props
+
+                itemsStr =
+                    items
+                        |> List.indexedMap (renderListItem listType)
+                        |> String.join "\n"
+            in
+            if Dict.isEmpty props then
+                itemsStr
+            else
+                "| item" ++ propsStr ++ "\n" ++ itemsStr
+
+        Enumerate ->
+            -- Enumerate lists with properties
+            let
+                propsStr =
+                    renderProperties props
+
+                itemsStr =
+                    items
+                        |> List.indexedMap (renderListItem listType)
+                        |> String.join "\n"
+            in
+            if Dict.isEmpty props then
+                itemsStr
+            else
+                "| numbered" ++ propsStr ++ "\n" ++ itemsStr
 
 
 renderListItem : ListType -> Int -> ListItem -> String
@@ -139,7 +165,7 @@ renderListItem listType index item =
                     "- "
 
                 Enumerate ->
-                    String.fromInt (index + 1) ++ ". "
+                    ". "
 
                 Description ->
                     -- This shouldn't be called for description lists
@@ -298,7 +324,7 @@ findClosingBrace str pos =
                 findClosingBrace str (pos + 1)
 
 
-{-| Render properties dict to string format: " key:value, key2:value2"
+{-| Render properties dict to string format: " key:value key2:value2"
 Returns empty string if no properties
 -}
 renderProperties : Properties -> String
@@ -311,7 +337,7 @@ renderProperties props =
             ++ (props
                     |> Dict.toList
                     |> List.map renderProperty
-                    |> String.join ", "
+                    |> String.join " "
                )
 
 

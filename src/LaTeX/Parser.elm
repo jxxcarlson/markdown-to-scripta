@@ -194,6 +194,83 @@ environmentParser =
             )
 
 
+{-| Extract \label{...} commands from content and return cleaned content with labels as properties
+-}
+extractLabels : String -> ( String, Properties )
+extractLabels content =
+    case findLabel content of
+        Nothing ->
+            ( content, Dict.empty )
+
+        Just ( before, labelValue, after ) ->
+            let
+                ( restContent, restProps ) =
+                    extractLabels after
+
+                cleanedContent =
+                    before ++ restContent
+            in
+            ( cleanedContent, Dict.insert "label" labelValue restProps )
+
+
+{-| Find the first \label{...} command in the string
+-}
+findLabel : String -> Maybe ( String, String, String )
+findLabel str =
+    case String.indexes "\\label{" str of
+        [] ->
+            Nothing
+
+        firstIndex :: _ ->
+            let
+                contentStart =
+                    firstIndex + 7
+
+                afterLabel =
+                    String.dropLeft contentStart str
+            in
+            case findClosingBrace afterLabel 0 of
+                Nothing ->
+                    Nothing
+
+                Just closingPos ->
+                    let
+                        before =
+                            String.left firstIndex str
+
+                        labelValue =
+                            String.left closingPos afterLabel
+
+                        after =
+                            String.dropLeft (closingPos + 1) afterLabel
+                    in
+                    Just ( before, labelValue, after )
+
+
+{-| Find the position of the closing brace for \label{}, accounting for nesting
+-}
+findClosingBrace : String -> Int -> Maybe Int
+findClosingBrace str pos =
+    case String.uncons (String.dropLeft pos str) of
+        Nothing ->
+            Nothing
+
+        Just ( char, _ ) ->
+            if char == '}' then
+                Just pos
+
+            else if char == '{' then
+                case findClosingBrace str (pos + 1) of
+                    Nothing ->
+                        Nothing
+
+                    Just nestedClose ->
+                        findClosingBrace str (nestedClose + 1)
+
+            else
+                findClosingBrace str (pos + 1)
+
+
 {-| Parse optional properties in square brackets: [key=value, key=value]
 -}
 optionalPropertiesParser : LaTeXParser Properties
@@ -302,7 +379,17 @@ itemParser listType =
 -}
 verbatimContentParser : Name -> Properties -> LaTeXParser Block
 verbatimContentParser envName props =
-    Parser.succeed (\content -> VerbatimBlock envName props (String.trim content))
+    Parser.succeed
+        (\content ->
+            let
+                ( cleanedContent, labelProps ) =
+                    extractLabels content
+
+                mergedProps =
+                    Dict.union labelProps props
+            in
+            VerbatimBlock envName mergedProps (String.trim cleanedContent)
+        )
         |= Parser.getChompedString (Parser.chompUntil (Parser.Token ("\\end{" ++ envName ++ "}") (ExpectingEnvironmentEnd envName)))
         |. symbol "\\end"
         |. spaces
