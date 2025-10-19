@@ -1,310 +1,379 @@
-module LaTeX.Parser exposing (parse)
+module LaTeX.Parser exposing (parse, deadEndsToString)
 
 import LaTeX.AST exposing (..)
-import Parser exposing (..)
+import Parser.Advanced as Parser exposing ((|.), (|=), Parser)
+
+
+{-| Custom problem type for better error messages
+-}
+type Problem
+    = ExpectingSymbol String
+    | ExpectingEnvironmentEnd String
+    | ExpectingBlockContent
+    | ExpectingInlineContent
+    | EmptyParagraph
+    | UnexpectedEndCommand
+    | Custom String
+
+
+{-| Context for tracking where we are in the parse
+-}
+type alias Context =
+    String
+
+
+{-| Parser type alias
+-}
+type alias LaTeXParser a =
+    Parser Context Problem a
+
+
+{-| Convert parse errors to a readable string
+-}
+deadEndsToString : List (Parser.DeadEnd Context Problem) -> String
+deadEndsToString deadEnds =
+    deadEnds
+        |> List.map deadEndToString
+        |> String.join "\n\n"
+
+
+deadEndToString : Parser.DeadEnd Context Problem -> String
+deadEndToString deadEnd =
+    let
+        position =
+            "Line " ++ String.fromInt deadEnd.row ++ ", Column " ++ String.fromInt deadEnd.col
+
+        problemMsg =
+            case deadEnd.problem of
+                ExpectingSymbol s ->
+                    "Expecting symbol: " ++ s
+
+                ExpectingEnvironmentEnd envName ->
+                    "Expecting \\end{" ++ envName ++ "}"
+
+                ExpectingBlockContent ->
+                    "Expecting block content"
+
+                ExpectingInlineContent ->
+                    "Expecting inline content"
+
+                EmptyParagraph ->
+                    "Empty paragraph"
+
+                UnexpectedEndCommand ->
+                    "Unexpected \\end command"
+
+                Custom msg ->
+                    msg
+
+        contextMsg =
+            if List.isEmpty deadEnd.contextStack then
+                ""
+
+            else
+                "\nContext: " ++ String.join " > " (List.map .context (List.reverse deadEnd.contextStack))
+    in
+    position ++ ": " ++ problemMsg ++ contextMsg
 
 
 {-| Parse LaTeX text into an AST
 -}
-parse : String -> Result (List DeadEnd) Document
+parse : String -> Result (List (Parser.DeadEnd Context Problem)) Document
 parse input =
-    run documentParser input
+    Parser.run documentParser input
 
 
 {-| Main document parser
 -}
-documentParser : Parser Document
+documentParser : LaTeXParser Document
 documentParser =
-    succeed identity
+    Parser.succeed identity
         |. spaces
-        |= loop [] documentHelper
-        |. end
+        |= Parser.loop [] documentHelper
+        |. Parser.end (ExpectingSymbol "end of input")
 
 
-documentHelper : List Block -> Parser (Step (List Block) (List Block))
+documentHelper : List Block -> LaTeXParser (Parser.Step (List Block) (List Block))
 documentHelper blocks =
-    oneOf
-        [ succeed (\_ -> Loop blocks)
+    Parser.oneOf
+        [ -- If at end of input, we're done
+          Parser.end (ExpectingSymbol "end of input")
+            |> Parser.map (\_ -> Parser.Done blocks)
+        , Parser.succeed (\_ -> Parser.Loop blocks)
             |= blankLineParser
-        , succeed (\block -> Loop (blocks ++ [ block ]))
+        , Parser.succeed (\block -> Parser.Loop (blocks ++ [ block ]))
             |= blockParser
-        , succeed ()
-            |> map (\_ -> Done blocks)
         ]
 
 
 {-| Parse any block element
 -}
-blockParser : Parser Block
+blockParser : LaTeXParser Block
 blockParser =
-    oneOf
-        [ sectionParser
-        , environmentParser
-        , paragraphParser
-        ]
+    Parser.inContext "block"
+        (Parser.oneOf
+            [ sectionParser
+            , environmentParser
+            , paragraphParser
+            ]
+        )
 
 
-{-| Parse sections: \section{}, \subsection{}, \subsubsection{}
+{-| Parse sections: \\section{}, \\subsection{}, \\subsubsection{}
 -}
-sectionParser : Parser Block
+sectionParser : LaTeXParser Block
 sectionParser =
-    oneOf
-        [ succeed (\title -> Section 1 title [])
+    Parser.oneOf
+        [ Parser.succeed (\title -> Section 1 title [])
             |. symbol "\\section"
             |. spaces
             |= braceContent
-            |. oneOf [ symbol "\n", end ]
-        , succeed (\title -> Section 2 title [])
+            |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
+        , Parser.succeed (\title -> Section 2 title [])
             |. symbol "\\subsection"
             |. spaces
             |= braceContent
-            |. oneOf [ symbol "\n", end ]
-        , succeed (\title -> Section 3 title [])
+            |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
+        , Parser.succeed (\title -> Section 3 title [])
             |. symbol "\\subsubsection"
             |. spaces
             |= braceContent
-            |. oneOf [ symbol "\n", end ]
+            |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
         ]
 
 
 {-| Parse content within braces: {content}
 -}
-braceContent : Parser String
+braceContent : LaTeXParser String
 braceContent =
-    succeed identity
+    Parser.succeed identity
         |. symbol "{"
-        |= getChompedString (chompUntil "}")
+        |= Parser.getChompedString (Parser.chompUntil (Parser.Token "}" (ExpectingSymbol "}")))
         |. symbol "}"
 
 
-{-| Parse environments: \begin{name}...\end{name}
+{-| Parse environments: \\begin{name}...\\end{name}
 -}
-environmentParser : Parser Block
+environmentParser : LaTeXParser Block
 environmentParser =
-    succeed identity
+    Parser.succeed identity
         |. symbol "\\begin"
         |. spaces
         |. symbol "{"
-        |= getChompedString (chompUntil "}")
+        |= Parser.getChompedString (Parser.chompUntil (Parser.Token "}" (ExpectingSymbol "}")))
         |. symbol "}"
         |. spaces
-        |. oneOf [ symbol "\n", succeed () ]
-        |> andThen
+        |. Parser.oneOf [ symbol "\n", Parser.succeed () ]
+        |> Parser.andThen
             (\envName ->
-                case envName of
-                    "itemize" ->
-                        listContentParser Itemize envName
+                Parser.inContext ("environment: " ++ envName)
+                    (case envName of
+                        "itemize" ->
+                            listContentParser Itemize envName
 
-                    "enumerate" ->
-                        listContentParser Enumerate envName
+                        "enumerate" ->
+                            listContentParser Enumerate envName
 
-                    "verbatim" ->
-                        verbatimContentParser envName
+                        "verbatim" ->
+                            verbatimContentParser envName
 
-                    "equation" ->
-                        verbatimContentParser envName
+                        "equation" ->
+                            verbatimContentParser envName
 
-                    "code" ->
-                        verbatimContentParser envName
+                        "code" ->
+                            verbatimContentParser envName
 
-                    _ ->
-                        ordinaryBlockParser envName
+                        _ ->
+                            ordinaryBlockParser envName
+                    )
             )
 
 
 {-| Parse list content (items)
 -}
-listContentParser : ListType -> Name -> Parser Block
+listContentParser : ListType -> Name -> LaTeXParser Block
 listContentParser listType envName =
-    loop [] (listItemHelper envName)
-        |> map (List listType)
+    Parser.loop [] (listItemHelper envName)
+        |> Parser.map (List listType)
 
 
-listItemHelper : Name -> List ListItem -> Parser (Step (List ListItem) (List ListItem))
+listItemHelper : Name -> List ListItem -> LaTeXParser (Parser.Step (List ListItem) (List ListItem))
 listItemHelper envName items =
-    oneOf
-        [ succeed (\item -> Loop (item :: items))
+    Parser.oneOf
+        [ Parser.succeed (\item -> Parser.Loop (item :: items))
             |. spaces
             |= itemParser
-        , succeed ()
+        , Parser.succeed ()
             |. spaces
             |. symbol "\\end"
             |. spaces
             |. symbol "{"
             |. token envName
             |. symbol "}"
-            |. oneOf [ symbol "\n", end ]
-            |> map (\_ -> Done (List.reverse items))
+            |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
+            |> Parser.map (\_ -> Parser.Done (List.reverse items))
         ]
 
 
-{-| Parse a single \item
+{-| Parse a single \\item
 -}
-itemParser : Parser ListItem
+itemParser : LaTeXParser ListItem
 itemParser =
-    succeed identity
+    Parser.succeed identity
         |. symbol "\\item"
         |. spaces
-        |= (getChompedString (chompUntilEndOr "\n")
-                |> andThen parseInlinesFromString
+        |= (Parser.getChompedString (Parser.chompUntilEndOr "\n")
+                |> Parser.andThen parseInlinesFromString
            )
-        |. oneOf [ symbol "\n", end ]
+        |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
 
 
 {-| Parse verbatim content (doesn't parse inner structure)
 -}
-verbatimContentParser : Name -> Parser Block
+verbatimContentParser : Name -> LaTeXParser Block
 verbatimContentParser envName =
-    succeed (\content -> VerbatimBlock envName (String.trim content))
-        |= getChompedString (chompUntil ("\\end{" ++ envName ++ "}"))
+    Parser.succeed (\content -> VerbatimBlock envName (String.trim content))
+        |= Parser.getChompedString (Parser.chompUntil (Parser.Token ("\\end{" ++ envName ++ "}") (ExpectingEnvironmentEnd envName)))
         |. symbol "\\end"
         |. spaces
         |. symbol "{"
         |. token envName
         |. symbol "}"
-        |. oneOf [ symbol "\n", end ]
+        |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
 
 
 {-| Parse ordinary block content (recursively parse blocks inside)
 -}
-ordinaryBlockParser : Name -> Parser Block
+ordinaryBlockParser : Name -> LaTeXParser Block
 ordinaryBlockParser envName =
-    loop [] (ordinaryBlockHelper envName)
-        |> map (OrdinaryBlock envName)
+    Parser.loop [] (ordinaryBlockHelper envName)
+        |> Parser.map (OrdinaryBlock envName)
 
 
-ordinaryBlockHelper : Name -> List Block -> Parser (Step (List Block) (List Block))
+ordinaryBlockHelper : Name -> List Block -> LaTeXParser (Parser.Step (List Block) (List Block))
 ordinaryBlockHelper envName blocks =
-    succeed identity
-        |. spaces
-        |> andThen
-            (\_ ->
-                oneOf
-                    [ succeed ()
-                        |. symbol "\\end"
-                        |. spaces
-                        |. symbol "{"
-                        |. token envName
-                        |. symbol "}"
-                        |. oneOf [ symbol "\n", end ]
-                        |> map (\_ -> Done (List.reverse blocks))
-                    , succeed (\block -> Loop (block :: blocks))
-                        |= blockParser
-                    ]
-            )
+    Parser.oneOf
+        [ Parser.succeed ()
+            |. spaces
+            |. symbol "\\end"
+            |. spaces
+            |. symbol "{"
+            |. token envName
+            |. symbol "}"
+            |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
+            |> Parser.map (\_ -> Parser.Done (List.reverse blocks))
+        , Parser.succeed (\block -> Parser.Loop (block :: blocks))
+            |. spaces
+            |= blockParser
+        ]
 
 
 {-| Parse paragraphs
 -}
-paragraphParser : Parser Block
+paragraphParser : LaTeXParser Block
 paragraphParser =
-    getChompedString (chompUntilEndOr "\n")
-        |> andThen
-            (\firstLine ->
-                if String.isEmpty firstLine then
-                    problem "Empty paragraph"
-
-                else
-                    succeed firstLine
-                        |. oneOf [ symbol "\n", end ]
-                        |> andThen
-                            (\first ->
-                                loop [ first ] paragraphHelper
-                                    |> andThen
-                                        (\lines ->
-                                            parseInlinesFromString (String.join " " lines)
-                                                |> map Paragraph
-                                        )
-                            )
-            )
-
-
-paragraphHelper : List String -> Parser (Step (List String) (List String))
-paragraphHelper lines =
-    oneOf
-        [ -- Check if next character is backslash (start of command/environment)
-          backtrackable (symbol "\\")
-            |> map (\_ -> Done (List.reverse lines))
-        , getChompedString (chompUntilEndOr "\n")
-            |> andThen
-                (\line ->
-                    if String.isEmpty line then
-                        succeed (Done (List.reverse lines))
+    Parser.inContext "paragraph"
+        (Parser.getChompedString (Parser.chompUntilEndOr "\n")
+            |> Parser.andThen
+                (\firstLine ->
+                    if String.isEmpty firstLine then
+                        Parser.problem EmptyParagraph
 
                     else
-                        succeed (Loop (line :: lines))
-                            |. oneOf [ symbol "\n", end ]
+                        Parser.succeed firstLine
+                            |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
+                            |> Parser.andThen
+                                (\first ->
+                                    Parser.loop [ first ] paragraphHelper
+                                        |> Parser.andThen
+                                            (\lines ->
+                                                parseInlinesFromString (String.join " " lines)
+                                                    |> Parser.map Paragraph
+                                            )
+                                )
                 )
-        , succeed (Done (List.reverse lines))
+        )
+
+
+paragraphHelper : List String -> LaTeXParser (Parser.Step (List String) (List String))
+paragraphHelper lines =
+    Parser.oneOf
+        [ -- If at end of input, we're done
+          Parser.end (ExpectingSymbol "end")
+            |> Parser.map (\_ -> Parser.Done (List.reverse lines))
+        , -- Try to parse another line, but use backtrackable to peek at first char
+          Parser.backtrackable
+            (Parser.getChompedString (Parser.chompIf (\_ -> True) (ExpectingSymbol "char"))
+                |> Parser.andThen
+                    (\c ->
+                        if c == "\\" then
+                            -- Hit backslash - fail so we backtrack and move to fallback
+                            Parser.problem (Custom "hit backslash")
+                        else if c == "\n" then
+                            -- Hit newline - empty line, done
+                            Parser.succeed (Parser.Done (List.reverse lines))
+                        else
+                            -- Normal char - get the rest of the line
+                            Parser.getChompedString (Parser.chompWhile (\ch -> ch /= '\n' && ch /= '\\'))
+                                |> Parser.andThen
+                                    (\rest ->
+                                        let
+                                            line = c ++ rest
+                                        in
+                                        Parser.succeed (Parser.Loop (line :: lines))
+                                            |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
+                                    )
+                    )
+            )
+        , -- Fallback: done (hit backslash or something else)
+          Parser.succeed (Parser.Done (List.reverse lines))
         ]
 
 
 {-| Parse blank lines
 -}
-blankLineParser : Parser Block
+blankLineParser : LaTeXParser Block
 blankLineParser =
-    succeed BlankLine
-        |. chompWhile (\c -> c == ' ' || c == '\t')
+    Parser.succeed BlankLine
+        |. Parser.chompWhile (\c -> c == ' ' || c == '\t')
         |. symbol "\n"
-
-
-{-| Helper to chomp until one of several strings
--}
-chompUntilOneOf : List String -> Parser ()
-chompUntilOneOf strings =
-    chompWhile
-        (\c ->
-            not
-                (List.any
-                    (\s -> String.startsWith s (String.fromChar c))
-                    strings
-                )
-        )
-
-
-{-| Parse inline elements from a Parser that chomps content
--}
-parseInlines : Parser () -> Parser (List Inline)
-parseInlines contentParser =
-    getChompedString contentParser
-        |> andThen parseInlinesFromString
 
 
 {-| Parse inline elements from a String
 -}
-parseInlinesFromString : String -> Parser (List Inline)
+parseInlinesFromString : String -> LaTeXParser (List Inline)
 parseInlinesFromString input =
-    case run inlinesParser input of
+    case Parser.run inlinesParser input of
         Ok inlines ->
-            succeed inlines
+            Parser.succeed inlines
 
         Err _ ->
-            succeed [ Text input ]
+            Parser.succeed [ Text input ]
 
 
 {-| Main inline parser
 -}
-inlinesParser : Parser (List Inline)
+inlinesParser : LaTeXParser (List Inline)
 inlinesParser =
-    loop [] inlinesHelper
+    Parser.loop [] inlinesHelper
 
 
-inlinesHelper : List Inline -> Parser (Step (List Inline) (List Inline))
+inlinesHelper : List Inline -> LaTeXParser (Parser.Step (List Inline) (List Inline))
 inlinesHelper inlines =
-    oneOf
-        [ succeed (\inline -> Loop (inline :: inlines))
+    Parser.oneOf
+        [ Parser.succeed (\inline -> Parser.Loop (inline :: inlines))
             |= inlineParser
-        , succeed ()
-            |> map (\_ -> Done (List.reverse inlines))
+        , Parser.succeed ()
+            |> Parser.map (\_ -> Parser.Done (List.reverse inlines))
         ]
 
 
 {-| Parse a single inline element
 -}
-inlineParser : Parser Inline
+inlineParser : LaTeXParser Inline
 inlineParser =
-    lazy (\_ ->
-        oneOf
+    Parser.lazy (\_ ->
+        Parser.oneOf
             [ commandParser
             , mathInlineParser
             , textParser
@@ -312,83 +381,104 @@ inlineParser =
     )
 
 
-{-| Parse LaTeX commands like \textbf{}, \emph{}, etc.
+{-| Parse LaTeX commands like \\textbf{}, \\emph{}, etc.
 -}
-commandParser : Parser Inline
+commandParser : LaTeXParser Inline
 commandParser =
-    succeed identity
+    Parser.succeed identity
         |. symbol "\\"
-        |= getChompedString (chompWhile Char.isAlpha)
-        |> andThen
+        |= Parser.getChompedString (Parser.chompWhile Char.isAlpha)
+        |> Parser.andThen
             (\cmdName ->
-                oneOf
+                Parser.oneOf
                     [ -- Commands with brace content
-                      succeed (\content -> Fun cmdName content)
+                      Parser.succeed (\content -> Fun cmdName content)
                         |. spaces
                         |. symbol "{"
                         |= braceInlineContent
                         |. symbol "}"
                     , -- Commands without arguments (like \\)
-                      succeed (Fun cmdName [])
+                      Parser.succeed (Fun cmdName [])
                     ]
             )
 
 
 {-| Parse inline content within braces (recursively)
 -}
-braceInlineContent : Parser (List Inline)
+braceInlineContent : LaTeXParser (List Inline)
 braceInlineContent =
-    lazy (\_ ->
-        getChompedString (chompBraceContent 0)
-            |> andThen parseInlinesFromString
+    Parser.lazy (\_ ->
+        Parser.getChompedString (chompBraceContent 0)
+            |> Parser.andThen parseInlinesFromString
     )
 
 
 {-| Chomp content inside braces, handling nesting
 -}
-chompBraceContent : Int -> Parser ()
+chompBraceContent : Int -> LaTeXParser ()
 chompBraceContent initialDepth =
-    loop initialDepth chompBraceHelper
+    Parser.loop initialDepth chompBraceHelper
 
 
-chompBraceHelper : Int -> Parser (Step Int ())
+chompBraceHelper : Int -> LaTeXParser (Parser.Step Int ())
 chompBraceHelper depth =
-    oneOf
-        [ succeed (Loop (depth + 1))
+    Parser.oneOf
+        [ Parser.succeed (Parser.Loop (depth + 1))
             |. symbol "{"
         , -- Look ahead for } without consuming it when depth is 0
-          backtrackable (symbol "}")
-            |> andThen
+          Parser.backtrackable (symbol "}")
+            |> Parser.andThen
                 (\_ ->
                     if depth > 0 then
-                        succeed (Loop (depth - 1))
+                        Parser.succeed (Parser.Loop (depth - 1))
 
                     else
                         -- Don't consume the closing brace, let caller handle it
-                        problem "Done chomping content"
+                        Parser.problem (Custom "Done chomping content")
                 )
-        , succeed (Loop depth)
-            |. chompIf (\c -> c /= '{' && c /= '}')
-        , succeed (Done ())
+        , Parser.succeed (Parser.Loop depth)
+            |. Parser.chompIf (\c -> c /= '{' && c /= '}') (ExpectingSymbol "character")
+        , Parser.succeed (Parser.Done ())
         ]
 
 
 {-| Parse inline math: $...$
 -}
-mathInlineParser : Parser Inline
+mathInlineParser : LaTeXParser Inline
 mathInlineParser =
-    succeed (\content -> VFun "math" ("$" ++ content ++ "$"))
+    Parser.succeed (\content -> VFun "math" ("$" ++ content ++ "$"))
         |. symbol "$"
-        |= getChompedString (chompUntil "$")
+        |= Parser.getChompedString (Parser.chompUntil (Parser.Token "$" (ExpectingSymbol "$")))
         |. symbol "$"
 
 
 {-| Parse plain text
 -}
-textParser : Parser Inline
+textParser : LaTeXParser Inline
 textParser =
-    succeed Text
-        |= getChompedString
-            (chompIf (\c -> c /= '\\' && c /= '$' && c /= '{' && c /= '}')
-                |. chompWhile (\c -> c /= '\\' && c /= '$' && c /= '{' && c /= '}')
+    Parser.succeed Text
+        |= Parser.getChompedString
+            (Parser.chompIf (\c -> c /= '\\' && c /= '$' && c /= '{' && c /= '}') (ExpectingSymbol "text character")
+                |. Parser.chompWhile (\c -> c /= '\\' && c /= '$' && c /= '{' && c /= '}')
             )
+
+
+{-| Helper: parse a symbol
+-}
+symbol : String -> LaTeXParser ()
+symbol str =
+    Parser.symbol (Parser.Token str (ExpectingSymbol str))
+
+
+{-| Helper: parse a token (runtime string)
+-}
+token : String -> LaTeXParser ()
+token str =
+    Parser.token (Parser.Token str (ExpectingSymbol str))
+
+
+{-| Helper: parse spaces
+-}
+spaces : LaTeXParser ()
+spaces =
+    Parser.chompWhile (\c -> c == ' ' || c == '\t' || c == '\n' || c == '\r')

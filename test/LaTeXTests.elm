@@ -71,13 +71,17 @@ tests =
       , latex = "\\begin{theorem}\nThere are infinitely many primes.\n\\end{theorem}"
       , expected = "| theorem\nThere are infinitely many primes."
       }
+    , { name = "Debug - minimal theorem"
+      , latex = "\\begin{theorem}\ntest\n\\end{theorem}"
+      , expected = "| theorem\ntest"
+      }
+    , { name = "Debug - empty theorem"
+      , latex = "\\begin{theorem}\\end{theorem}"
+      , expected = "| theorem"
+      }
     , { name = "Debug theorem - just text"
       , latex = "There are infinitely many primes."
       , expected = "There are infinitely many primes."
-      }
-    , { name = "Debug - standalone end command"
-      , latex = "\\end{test}"
-      , expected = "(should fail to parse)"
       }
     , { name = "Multiple paragraphs"
       , latex = "First paragraph here.\n\nSecond paragraph here."

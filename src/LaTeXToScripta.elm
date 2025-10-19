@@ -20,6 +20,6 @@ convert latex =
         Ok ast ->
             Renderer.render ast
 
-        Err _ ->
-            -- On parse error, return original text
-            latex
+        Err errors ->
+            -- On parse error, return error message for debugging
+            "PARSE ERROR:\n" ++ Parser.deadEndsToString errors
