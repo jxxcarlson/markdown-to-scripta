@@ -1,11 +1,20 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Json.Decode as D
+import Json.Encode as E
 import LaTeXToScripta
 import MarkdownToScripta
+
+
+-- PORTS
+
+
+port saveToLocalStorage : E.Value -> Cmd msg
+
 
 
 -- MODEL
@@ -19,15 +28,52 @@ type InputMode
 type alias Model =
     { input : String
     , scripta : String
+    , sources : List ( InputMode, String )
     , mode : InputMode
     }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( { input = exampleMarkdown
+type alias Flags =
+    { markdownSource : Maybe String
+    , latexSource : Maybe String
+    , mode : Maybe String
+    }
+
+
+init : Flags -> ( Model, Cmd Msg )
+init flags =
+    let
+        mode =
+            case flags.mode of
+                Just "LaTeX" ->
+                    LaTeX
+
+                _ ->
+                    Markdown
+
+        markdownSource =
+            Maybe.withDefault exampleMarkdown flags.markdownSource
+
+        latexSource =
+            Maybe.withDefault exampleLaTeX flags.latexSource
+
+        sources =
+            [ ( Markdown, markdownSource )
+            , ( LaTeX, latexSource )
+            ]
+
+        input =
+            case mode of
+                Markdown ->
+                    markdownSource
+
+                LaTeX ->
+                    latexSource
+    in
+    ( { input = input
       , scripta = ""
-      , mode = Markdown
+      , sources = sources
+      , mode = mode
       }
     , Cmd.none
     )
@@ -135,7 +181,23 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         InputChanged newInput ->
-            ( { model | input = newInput }, Cmd.none )
+            let
+                -- Update the appropriate source in the sources list
+                updatedSources =
+                    List.map
+                        (\( mode, source ) ->
+                            if mode == model.mode then
+                                ( mode, newInput )
+
+                            else
+                                ( mode, source )
+                        )
+                        model.sources
+
+                newModel =
+                    { model | input = newInput, sources = updatedSources }
+            in
+            ( newModel, saveToLocalStorage (encodeModel newModel) )
 
         Convert ->
             let
@@ -153,17 +215,64 @@ update msg model =
 
         SwitchMode newMode ->
             let
-                newInput =
-                    case newMode of
-                        Markdown ->
-                            exampleMarkdown
+                -- Save current input to sources before switching
+                updatedSources =
+                    List.map
+                        (\( mode, source ) ->
+                            if mode == model.mode then
+                                ( mode, model.input )
 
-                        LaTeX ->
-                            exampleLaTeX
+                            else
+                                ( mode, source )
+                        )
+                        model.sources
+
+                -- Get the source for the new mode
+                newInput =
+                    updatedSources
+                        |> List.filter (\( mode, _ ) -> mode == newMode)
+                        |> List.head
+                        |> Maybe.map Tuple.second
+                        |> Maybe.withDefault
+                            (case newMode of
+                                Markdown ->
+                                    exampleMarkdown
+
+                                LaTeX ->
+                                    exampleLaTeX
+                            )
+
+                newModel =
+                    { model | mode = newMode, input = newInput, sources = updatedSources, scripta = "" }
             in
-            ( { model | mode = newMode, input = newInput, scripta = "" }
-            , Cmd.none
-            )
+            ( newModel, saveToLocalStorage (encodeModel newModel) )
+
+
+{-| Encode model state for localStorage
+-}
+encodeModel : Model -> E.Value
+encodeModel model =
+    let
+        getSource mode =
+            model.sources
+                |> List.filter (\( m, _ ) -> m == mode)
+                |> List.head
+                |> Maybe.map Tuple.second
+                |> Maybe.withDefault ""
+
+        modeString =
+            case model.mode of
+                Markdown ->
+                    "Markdown"
+
+                LaTeX ->
+                    "LaTeX"
+    in
+    E.object
+        [ ( "markdownSource", E.string (getSource Markdown) )
+        , ( "latexSource", E.string (getSource LaTeX) )
+        , ( "mode", E.string modeString )
+        ]
 
 
 -- VIEW
@@ -272,11 +381,34 @@ ruleItem title description =
 -- MAIN
 
 
-main : Program () Model Msg
+main : Program E.Value Model Msg
 main =
     Browser.element
-        { init = init
+        { init = init << decodeFlags
         , update = update
         , view = view
         , subscriptions = \_ -> Sub.none
         }
+
+
+{-| Decode flags from JavaScript
+-}
+decodeFlags : E.Value -> Flags
+decodeFlags value =
+    let
+        decoder =
+            D.map3 Flags
+                (D.field "markdownSource" (D.nullable D.string))
+                (D.field "latexSource" (D.nullable D.string))
+                (D.field "mode" (D.nullable D.string))
+    in
+    case D.decodeValue decoder value of
+        Ok flags ->
+            flags
+
+        Err _ ->
+            -- Return empty flags if decoding fails
+            { markdownSource = Nothing
+            , latexSource = Nothing
+            , mode = Nothing
+            }
