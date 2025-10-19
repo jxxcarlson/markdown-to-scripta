@@ -103,6 +103,10 @@ tests =
       , latex = "\\begin{equation}\n\\label{eq:newton}\nm \\ddot{\\vb x}(t) = -\\nabla V\\!\\bigl(\\vb x(t)\\bigr).\n\\end{equation}"
       , expected = "| equation label:eq:newton\nm \\ddot{\\vb x}(t) = -\\nabla V\\!\\bigl(\\vb x(t)\\bigr)."
       }
+    , { name = "Align environment"
+      , latex = "\\begin{align}\n\\int_{0}^{1} x^n \\, dx &= \\frac{1}{n+1}, \\qquad n>-1,\\\\\n\\sum_{k=1}^{\\infty} \\frac{1}{k^2} &= \\frac{\\pi^2}{6}.\n\\end{align}"
+      , expected = "| aligned\n  \\int_{0}^{1} x^n \\, dx &= \\frac{1}{n+1}, \\qquad n>-1,\\\\\n  \\sum_{k=1}^{\\infty} \\frac{1}{k^2} &= \\frac{\\pi^2}{6}."
+      }
     ]
 
 

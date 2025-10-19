@@ -185,6 +185,9 @@ environmentParser =
                         "equation" ->
                             verbatimContentParser envName props
 
+                        "align" ->
+                            verbatimContentParser envName props
+
                         "code" ->
                             verbatimContentParser envName props
 

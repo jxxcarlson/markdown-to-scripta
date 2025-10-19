@@ -65,6 +65,9 @@ renderBlock block =
                         "equation" ->
                             "equation"
 
+                        "align" ->
+                            "aligned"
+
                         _ ->
                             envName
 
@@ -74,6 +77,9 @@ renderBlock block =
                             indentLines content
 
                         "code" ->
+                            indentLines content
+
+                        "align" ->
                             indentLines content
 
                         _ ->
