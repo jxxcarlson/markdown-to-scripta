@@ -119,6 +119,10 @@ tests =
       , latex = "\\begin{table}[h!]\n\\centering\n\\begin{tabular}{l S[table-format=2.2] S[table-format=1.3]}\n\\toprule\n{Method} & {Accuracy (\\%)} & {Time (s)}\\\\\n\\midrule\nBaseline & 72.45 & 0.153\\\\\nModel A  & 83.10 & 0.982\\\\\nModel B  & 85.25 & 1.247\\\\\n\\bottomrule\n\\end{tabular}\n\\caption{Example results}\n\\label{tab:ex}\n\\end{table}"
       , expected = "| table caption:Example results label:tab:ex table-format:h!\nBaseline & 72.45 & 0.153\nModel A  & 83.10 & 0.982\nModel B  & 85.25 & 1.247"
       }
+    , { name = "TikZ picture"
+      , latex = "\\begin{tikzpicture}[scale=1.0]\n  % Axes\n  \\draw[->] (-0.2,0) -- (4.2,0) node[right] {$x$};\n  \\draw[->] (0,-0.2) -- (0,3.2) node[above] {$y$};\n\\end{tikzpicture}"
+      , expected = "| tikz get:image scale:1.0\n\\begin{tikzpicture}\n  % Axes\n  \\draw[->] (-0.2,0) -- (4.2,0) node[right] {$x$};\n  \\draw[->] (0,-0.2) -- (0,3.2) node[above] {$y$};\n\\end{tikzpicture}"
+      }
     ]
 
 

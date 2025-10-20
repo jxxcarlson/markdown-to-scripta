@@ -194,6 +194,9 @@ environmentParser =
                         "lstlisting" ->
                             verbatimContentParser envName props
 
+                        "tikzpicture" ->
+                            tikzpictureContentParser envName props
+
                         "table" ->
                             tableContentParser envName props
 
@@ -398,6 +401,32 @@ verbatimContentParser envName props =
                     Dict.union labelProps props
             in
             VerbatimBlock envName mergedProps (String.trim cleanedContent)
+        )
+        |= Parser.getChompedString (Parser.chompUntil (Parser.Token ("\\end{" ++ envName ++ "}") (ExpectingEnvironmentEnd envName)))
+        |. symbol "\\end"
+        |. spaces
+        |. symbol "{"
+        |. token envName
+        |. symbol "}"
+        |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
+
+
+{-| Parse tikzpicture content, preserving begin/end tags
+-}
+tikzpictureContentParser : Name -> Properties -> LaTeXParser Block
+tikzpictureContentParser envName props =
+    Parser.succeed
+        (\content ->
+            let
+                -- Add get:image property
+                tikzProps =
+                    Dict.insert "get" "image" props
+
+                -- Reconstruct full tikzpicture with begin/end tags
+                fullContent =
+                    "\\begin{tikzpicture}\n" ++ String.trim content ++ "\n\\end{tikzpicture}"
+            in
+            VerbatimBlock "tikz" tikzProps fullContent
         )
         |= Parser.getChompedString (Parser.chompUntil (Parser.Token ("\\end{" ++ envName ++ "}") (ExpectingEnvironmentEnd envName)))
         |. symbol "\\end"
