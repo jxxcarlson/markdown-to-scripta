@@ -105,7 +105,7 @@ renderListItem item =
 
         marker =
             if item.ordered then
-                String.fromInt (item.number |> Maybe.withDefault 1) ++ ". "
+                ". "
             else
                 "- "
     in

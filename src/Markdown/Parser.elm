@@ -1,5 +1,6 @@
 module Markdown.Parser exposing (parse)
 
+import Char
 import Markdown.AST exposing (..)
 import Parser exposing (..)
 
@@ -252,8 +253,8 @@ listHelper items =
 listItemParser : Parser ListItem
 listItemParser =
     oneOf
-        [ backtrackable unorderedListItemParser
-        , backtrackable orderedListItemParser
+        [ backtrackable orderedListItemParser
+        , backtrackable unorderedListItemParser
         ]
 
 
@@ -272,16 +273,20 @@ unorderedListItemParser =
 
 orderedListItemParser : Parser ListItem
 orderedListItemParser =
-    succeed (\indent num content -> { indent = indent, ordered = True, number = Just num, content = content })
+    succeed Tuple.pair
         |= (getChompedString (chompWhile (\c -> c == ' '))
                 |> map String.length
            )
         |= int
-        |. symbol ". "
-        |= (getChompedString (chompUntilEndOr "\n")
-                |> andThen parseInlines
-           )
-        |. oneOf [ symbol "\n", end ]
+        |> andThen
+            (\( indent, num ) ->
+                succeed (\content -> { indent = indent, ordered = True, number = Just num, content = content })
+                    |. symbol ". "
+                    |= (getChompedString (chompUntilEndOr "\n")
+                            |> andThen parseInlines
+                       )
+                    |. oneOf [ symbol "\n", end ]
+            )
 
 
 {-| Parse paragraphs
