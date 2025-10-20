@@ -401,13 +401,13 @@ boldParser =
     oneOf
         [ succeed Bold
             |. symbol "**"
-            |= (getChompedString (chompUntil "**")
+            |= (getChompedString (chompWhile (\c -> c /= '*'))
                     |> andThen parseInlines
                )
             |. symbol "**"
         , succeed Bold
             |. symbol "__"
-            |= (getChompedString (chompUntil "__")
+            |= (getChompedString (chompWhile (\c -> c /= '_'))
                     |> andThen parseInlines
                )
             |. symbol "__"
