@@ -1,5 +1,6 @@
 module Markdown.Parser exposing (parse)
 
+import Char
 import Markdown.AST exposing (..)
 import Parser exposing (..)
 
@@ -276,6 +277,7 @@ orderedListItemParser =
         |= (getChompedString (chompWhile (\c -> c == ' '))
                 |> map String.length
            )
+        |. backtrackable (chompIf Char.isDigit)
         |= int
         |. symbol ". "
         |= (getChompedString (chompUntilEndOr "\n")
@@ -401,13 +403,13 @@ boldParser =
     oneOf
         [ succeed Bold
             |. symbol "**"
-            |= (getChompedString (chompWhile (\c -> c /= '*' && c /= '\n'))
+            |= (getChompedString (chompWhile (\c -> c /= '*'))
                     |> andThen parseInlines
                )
             |. symbol "**"
         , succeed Bold
             |. symbol "__"
-            |= (getChompedString (chompWhile (\c -> c /= '_' && c /= '\n'))
+            |= (getChompedString (chompWhile (\c -> c /= '_'))
                     |> andThen parseInlines
                )
             |. symbol "__"
