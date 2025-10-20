@@ -111,6 +111,10 @@ tests =
       , latex = "\\begin{theorem}[Cauchy--Schwarz]\nFor all $\\vb x,\\vb y\\in V$,\n\\begin{equation}\n|\\langle \\vb x,\\vb y\\rangle| \\le \\|\\vb x\\|\\;\\|\\vb y\\|.\n\\end{equation}\n\\end{theorem}"
       , expected = "| theorem Cauchy--Schwarz\n  For all $\\vb x,\\vb y\\in V$,\n\n  | equation\n  |\\langle \\vb x,\\vb y\\rangle| \\le \\|\\vb x\\|\\;\\|\\vb y\\|."
       }
+    , { name = "Table with caption and label"
+      , latex = "\\begin{table}[h!]\n\\centering\n\\begin{tabular}{l S[table-format=2.2] S[table-format=1.3]}\n\\toprule\n{Method} & {Accuracy (\\%)} & {Time (s)}\\\\\n\\midrule\nBaseline & 72.45 & 0.153\\\\\nModel A  & 83.10 & 0.982\\\\\nModel B  & 85.25 & 1.247\\\\\n\\bottomrule\n\\end{tabular}\n\\caption{Example results}\n\\label{tab:ex}\n\\end{table}"
+      , expected = "| table caption:Example results label:tab:ex table-format:h!\nBaseline & 72.45 & 0.153\nModel A  & 83.10 & 0.982\nModel B  & 85.25 & 1.247"
+      }
     ]
 
 

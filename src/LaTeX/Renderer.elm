@@ -82,6 +82,9 @@ renderBlock block =
                         "align" ->
                             content |> String.trim |> indentLines
 
+                        "table" ->
+                            content |> String.trim
+
                         _ ->
                             content
             in

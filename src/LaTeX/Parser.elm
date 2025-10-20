@@ -191,6 +191,9 @@ environmentParser =
                         "code" ->
                             verbatimContentParser envName props
 
+                        "table" ->
+                            tableContentParser envName props
+
                         _ ->
                             ordinaryBlockParser envName props
                     )
@@ -400,6 +403,179 @@ verbatimContentParser envName props =
         |. token envName
         |. symbol "}"
         |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
+
+
+{-| Parse table content with caption, label, and tabular data
+-}
+tableContentParser : Name -> Properties -> LaTeXParser Block
+tableContentParser envName props =
+    Parser.succeed
+        (\content ->
+            let
+                -- Transform standalone properties to table-format
+                tableFormatProps =
+                    transformTableFormatProps props
+
+                tableProps =
+                    extractTableProperties content
+
+                tabularContent =
+                    extractTabularContent content
+
+                mergedProps =
+                    Dict.union tableProps tableFormatProps
+            in
+            VerbatimBlock "table" mergedProps tabularContent
+        )
+        |= Parser.getChompedString (Parser.chompUntil (Parser.Token ("\\end{" ++ envName ++ "}") (ExpectingEnvironmentEnd envName)))
+        |. symbol "\\end"
+        |. spaces
+        |. symbol "{"
+        |. token envName
+        |. symbol "}"
+        |. Parser.oneOf [ symbol "\n", Parser.end (ExpectingSymbol "end") ]
+
+
+{-| Transform standalone properties (value "?") to table-format property
+-}
+transformTableFormatProps : Properties -> Properties
+transformTableFormatProps props =
+    let
+        standaloneProps =
+            props
+                |> Dict.toList
+                |> List.filter (\( _, value ) -> value == "?")
+                |> List.map Tuple.first
+
+        regularProps =
+            props
+                |> Dict.filter (\_ value -> value /= "?")
+    in
+    case standaloneProps of
+        [] ->
+            regularProps
+
+        first :: _ ->
+            Dict.insert "table-format" first regularProps
+
+
+{-| Extract caption and label from table content as properties
+-}
+extractTableProperties : String -> Properties
+extractTableProperties content =
+    let
+        ( _, labelProps ) =
+            extractLabels content
+
+        captionProps =
+            case findCaption content of
+                Nothing ->
+                    Dict.empty
+
+                Just captionText ->
+                    Dict.singleton "caption" captionText
+    in
+    Dict.union captionProps labelProps
+
+
+{-| Find caption text in table content
+-}
+findCaption : String -> Maybe String
+findCaption str =
+    case String.indexes "\\caption{" str of
+        [] ->
+            Nothing
+
+        firstIndex :: _ ->
+            let
+                contentStart =
+                    firstIndex + 9
+
+                afterCaption =
+                    String.dropLeft contentStart str
+            in
+            case findClosingBrace afterCaption 0 of
+                Nothing ->
+                    Nothing
+
+                Just closingPos ->
+                    Just (String.left closingPos afterCaption)
+
+
+{-| Extract and clean tabular content from table environment
+-}
+extractTabularContent : String -> String
+extractTabularContent content =
+    case String.indexes "\\begin{tabular}" content of
+        [] ->
+            ""
+
+        firstIndex :: _ ->
+            let
+                -- Find where the column spec ends and content begins
+                afterBegin =
+                    String.dropLeft (firstIndex + 15) content
+
+                -- Look for the closing brace of the column spec {columns}
+                contentStart =
+                    case String.indexes "}" afterBegin of
+                        [] ->
+                            0
+
+                        idx :: _ ->
+                            idx + 1
+
+                tabularBody =
+                    String.dropLeft contentStart afterBegin
+                        |> String.split "\\end{tabular}"
+                        |> List.head
+                        |> Maybe.withDefault ""
+            in
+            cleanTableRows tabularBody
+
+
+{-| Clean table rows by removing rules and processing data rows
+-}
+cleanTableRows : String -> String
+cleanTableRows content =
+    content
+        |> String.lines
+        |> List.filterMap cleanTableRow
+        |> String.join "\n"
+        |> String.trim
+
+
+{-| Clean a single table row, returning Nothing for rows to skip
+-}
+cleanTableRow : String -> Maybe String
+cleanTableRow line =
+    let
+        trimmed =
+            String.trim line
+    in
+    -- Skip empty lines, rules, and commands
+    if String.isEmpty trimmed then
+        Nothing
+    else if String.startsWith "\\" trimmed then
+        -- Skip LaTeX commands like \toprule, \midrule, \bottomrule, \centering
+        Nothing
+    else if String.contains "&" trimmed then
+        -- Keep data rows with column separators
+        -- Remove trailing \\ and curly braces from cells
+        Just (cleanRowContent trimmed)
+    else
+        Nothing
+
+
+{-| Clean row content by removing trailing \\ and braces from cells
+-}
+cleanRowContent : String -> String
+cleanRowContent row =
+    row
+        |> String.split "\\\\"
+        |> List.head
+        |> Maybe.withDefault row
+        |> String.trim
 
 
 {-| Parse ordinary block content (recursively parse blocks inside)
