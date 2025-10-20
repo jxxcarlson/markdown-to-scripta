@@ -45,7 +45,7 @@ blockParser =
         , fencedCodeBlockParser
         , indentedCodeBlockParser
         , blockquoteParser
-        , tableParser
+        , backtrackable tableParser
         , listParser
         , paragraphParser
         ]
@@ -252,10 +252,12 @@ listHelper items =
 
 listItemParser : Parser ListItem
 listItemParser =
-    oneOf
-        [ backtrackable orderedListItemParser
-        , backtrackable unorderedListItemParser
-        ]
+    backtrackable
+        (oneOf
+            [ orderedListItemParser
+            , unorderedListItemParser
+            ]
+        )
 
 
 unorderedListItemParser : Parser ListItem
@@ -273,20 +275,23 @@ unorderedListItemParser =
 
 orderedListItemParser : Parser ListItem
 orderedListItemParser =
-    succeed Tuple.pair
+    succeed (\indent numStr content -> { indent = indent, ordered = True, number = String.toInt numStr, content = content })
         |= (getChompedString (chompWhile (\c -> c == ' '))
                 |> map String.length
            )
-        |= int
-        |> andThen
-            (\( indent, num ) ->
-                succeed (\content -> { indent = indent, ordered = True, number = Just num, content = content })
-                    |. symbol ". "
-                    |= (getChompedString (chompUntilEndOr "\n")
-                            |> andThen parseInlines
-                       )
-                    |. oneOf [ symbol "\n", end ]
-            )
+        |= (getChompedString (chompWhile Char.isDigit)
+                |> andThen (\str ->
+                    if String.isEmpty str then
+                        problem "Expected number"
+                    else
+                        succeed str
+                )
+           )
+        |. symbol ". "
+        |= (getChompedString (chompUntilEndOr "\n")
+                |> andThen parseInlines
+           )
+        |. oneOf [ symbol "\n", end ]
 
 
 {-| Parse paragraphs
@@ -301,13 +306,15 @@ paragraphParser =
                 else
                     succeed firstLine
                         |. oneOf [ symbol "\n", end ]
-                        |> andThen (\first ->
-                            loop [ first ] paragraphHelper
-                                |> andThen (\lines ->
-                                    parseInlines (String.join " " lines)
-                                        |> map Paragraph
-                                )
-                        )
+                        |> andThen
+                            (\first ->
+                                loop [ first ] paragraphHelper
+                                    |> andThen
+                                        (\lines ->
+                                            parseInlines (String.join " " lines)
+                                                |> map Paragraph
+                                        )
+                            )
             )
 
 

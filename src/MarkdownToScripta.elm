@@ -20,6 +20,6 @@ convert markdown =
         Ok ast ->
             Renderer.render ast
 
-        Err _ ->
+        Err errors ->
             -- On parse error, return original text
             markdown

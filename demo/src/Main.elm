@@ -77,10 +77,25 @@ init flags =
       }
     , Cmd.none
     )
-
-
 exampleMarkdown : String
-exampleMarkdown =
+exampleMarkdown = """
+- **Mount LED** to aluminum end cap with thermal adhesive — this acts as the heat sink.
+- Place **diffuser** 10–20 mm ahead of LED for soft, even light.
+- Wire: LED → constant-current driver → dimmer → USB-C input.
+- Slide 25 mm housing into **FM-31 bracket** and tighten.
+- Adjust beam so it fills the condenser aperture evenly.
+
+
+1. **Mount LED** to aluminum end cap with thermal adhesive — this acts as the heat sink.
+2. Place **diffuser** 10–20 mm ahead of LED for soft, even light.
+3. Wire: LED → constant-current driver → dimmer → USB-C input.
+4. Slide 25 mm housing into **FM-31 bracket** and tighten.
+5. Adjust beam so it fills the condenser aperture evenly.
+
+"""
+
+exampleMarkdown2 : String
+exampleMarkdown2=
     """# Welcome to Markdown
 
 This is a **bold** statement and this is *italic*.
