@@ -1,6 +1,5 @@
 module Markdown.Parser exposing (parse)
 
-import Char
 import Markdown.AST exposing (..)
 import Parser exposing (..)
 
@@ -253,8 +252,8 @@ listHelper items =
 listItemParser : Parser ListItem
 listItemParser =
     oneOf
-        [ unorderedListItemParser
-        , orderedListItemParser
+        [ backtrackable unorderedListItemParser
+        , backtrackable orderedListItemParser
         ]
 
 
@@ -277,7 +276,6 @@ orderedListItemParser =
         |= (getChompedString (chompWhile (\c -> c == ' '))
                 |> map String.length
            )
-        |. backtrackable (chompIf Char.isDigit)
         |= int
         |. symbol ". "
         |= (getChompedString (chompUntilEndOr "\n")
