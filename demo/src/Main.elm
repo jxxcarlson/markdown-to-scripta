@@ -339,42 +339,6 @@ view model =
                 ]
             ]
         , button [ onClick Convert, class "convert-btn" ] [ text "Convert to Scripta" ]
-        , viewRules model.mode
-        ]
-
-
-viewRules : InputMode -> Html Msg
-viewRules mode =
-    div [ class "rules" ]
-        [ h2 [] [ text "Conversion Rules" ]
-        , div [ class "rules-grid" ]
-            (case mode of
-                Markdown ->
-                    [ ruleItem "Headings" "Same as Markdown (# ## ###)"
-                    , ruleItem "Bold/Italic" "**bold** → [b bold], *italic* → [i italic]"
-                    , ruleItem "Links" "[text](url) → [link text url]"
-                    , ruleItem "Images" "![alt](url) → [link alt url]"
-                    , ruleItem "Code Blocks" "``` → | code"
-                    , ruleItem "Blockquotes" "> text → | quotation"
-                    ]
-
-                LaTeX ->
-                    [ ruleItem "Sections" "\\section{} → #, \\subsection{} → ##"
-                    , ruleItem "Bold/Italic" "\\textbf{} → [b], \\textit{} → [i]"
-                    , ruleItem "Math" "$...$ → $...$, \\begin{equation} → | equation"
-                    , ruleItem "Code" "\\texttt{} → `, \\begin{verbatim} → | code"
-                    , ruleItem "Lists" "\\begin{itemize} → -, \\begin{enumerate} → 1."
-                    , ruleItem "Environments" "\\begin{theorem} → | theorem"
-                    ]
-            )
-        ]
-
-
-ruleItem : String -> String -> Html Msg
-ruleItem title description =
-    div [ class "rule-item" ]
-        [ div [ class "rule-title" ] [ text title ]
-        , div [ class "rule-desc" ] [ text description ]
         ]
 
 
