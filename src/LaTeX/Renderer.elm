@@ -62,6 +62,9 @@ renderBlock block =
                         "code" ->
                             "code"
 
+                        "lstlisting" ->
+                            "code"
+
                         "equation" ->
                             "equation"
 
@@ -77,6 +80,9 @@ renderBlock block =
                             content |> String.trim |> indentLines
 
                         "code" ->
+                            content |> String.trim |> indentLines
+
+                        "lstlisting" ->
                             content |> String.trim |> indentLines
 
                         "align" ->

@@ -63,6 +63,10 @@ tests =
       , latex = "\\begin{verbatim}\nfor i in range(5):\n    print(i)\n\\end{verbatim}"
       , expected = "| code\n  for i in range(5):\n      print(i)"
       }
+    , { name = "Lstlisting block"
+      , latex = "\\begin{lstlisting}\ndef hello():\n    print('Hello, world!')\n\\end{lstlisting}"
+      , expected = "| code\n  def hello():\n      print('Hello, world!')"
+      }
     , { name = "Equation environment"
       , latex = "\\begin{equation}\na^2 + b^2 = c^2\n\\end{equation}"
       , expected = "| equation\na^2 + b^2 = c^2"

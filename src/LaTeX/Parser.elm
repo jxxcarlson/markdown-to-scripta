@@ -191,6 +191,9 @@ environmentParser =
                         "code" ->
                             verbatimContentParser envName props
 
+                        "lstlisting" ->
+                            verbatimContentParser envName props
+
                         "table" ->
                             tableContentParser envName props
 
