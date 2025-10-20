@@ -69,11 +69,11 @@ tests =
       }
     , { name = "Ordinary block (theorem)"
       , latex = "\\begin{theorem}\nThere are infinitely many primes.\n\\end{theorem}"
-      , expected = "| theorem\nThere are infinitely many primes."
+      , expected = "| theorem\n  There are infinitely many primes."
       }
     , { name = "Debug - minimal theorem"
       , latex = "\\begin{theorem}\ntest\n\\end{theorem}"
-      , expected = "| theorem\ntest"
+      , expected = "| theorem\n  test"
       }
     , { name = "Debug - empty theorem"
       , latex = "\\begin{theorem}\\end{theorem}"
@@ -93,7 +93,7 @@ tests =
       }
     , { name = "Environment with properties"
       , latex = "\\begin{theorem}[leftmargin=2em,label=\\arabic*,blahblah]\nThere are infinitely many primes.\n\\end{theorem}"
-      , expected = "| theorem leftmargin:2em label:\\arabic* blahblah\nThere are infinitely many primes."
+      , expected = "| theorem leftmargin:2em label:\\arabic* blahblah\n  There are infinitely many primes."
       }
     , { name = "Lists with properties"
       , latex = "\\begin{itemize}[leftmargin=2em]\n\\item Bullet one.\n\\item Bullet two with inline math $a^2+b^2=c^2$.\n\\end{itemize}\n\\begin{enumerate}[leftmargin=2em,label=\\arabic*)]\n\\item First.\n\\item Second.\n\\item Third.\n\\end{enumerate}"
@@ -109,7 +109,7 @@ tests =
       }
     , { name = "Theorem with nested equation"
       , latex = "\\begin{theorem}[Cauchy--Schwarz]\nFor all $\\vb x,\\vb y\\in V$,\n\\begin{equation}\n|\\langle \\vb x,\\vb y\\rangle| \\le \\|\\vb x\\|\\;\\|\\vb y\\|.\n\\end{equation}\n\\end{theorem}"
-      , expected = "| theorem Cauchy--Schwarz\nFor all $\\vb x,\\vb y\\in V$,\n\n| equation\n|\\langle \\vb x,\\vb y\\rangle| \\le \\|\\vb x\\|\\;\\|\\vb y\\|."
+      , expected = "| theorem Cauchy--Schwarz\n  For all $\\vb x,\\vb y\\in V$,\n\n  | equation\n  |\\langle \\vb x,\\vb y\\rangle| \\le \\|\\vb x\\|\\;\\|\\vb y\\|."
       }
     ]
 

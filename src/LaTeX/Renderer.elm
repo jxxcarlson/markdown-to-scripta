@@ -74,13 +74,13 @@ renderBlock block =
                 contentStr =
                     case envName of
                         "verbatim" ->
-                            indentLines content
+                            content |> String.trim |> indentLines
 
                         "code" ->
-                            indentLines content
+                            content |> String.trim |> indentLines
 
                         "align" ->
-                            indentLines content
+                            content |> String.trim |> indentLines
 
                         _ ->
                             content
@@ -99,8 +99,14 @@ renderBlock block =
 
                         _ ->
                             envName
+
+                renderedBlocks =
+                    blocks
+                        |> List.map renderBlock
+                        |> String.join "\n\n"
+                        |> indentLines
             in
-            "| " ++ blockName ++ propsStr ++ "\n" ++ (blocks |> List.map renderBlock |> String.join "\n\n")
+            "| " ++ blockName ++ propsStr ++ "\n" ++ renderedBlocks
 
         BlankLine ->
             ""
